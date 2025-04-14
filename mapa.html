@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Zonificación Res. 121/14 - Colores Oficiales</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- CSS de Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    /* Pantalla completa */
+    html, body {
+      margin: 0; 
+      padding: 0; 
+      height: 100%;
+    }
+    #map {
+      height: 100%;
+      width: 100%;
+    }
+    /* Leyenda */
+    .legend {
+      background: white;
+      padding: 10px;
+      line-height: 18px;
+      color: #555;
+      box-shadow: 0 0 15px rgba(0,0,0,0.2);
+      border-radius: 5px;
+      font-size: 14px;
+    }
+    .legend i {
+      width: 18px;
+      height: 18px;
+      float: left;
+      margin-right: 8px;
+      opacity: 0.7;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // 1) Crear mapa
+    var map = L.map('map').setView([-27.45, -58.99], 10);
+
+    // 2) Capa base
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // 3) Función: asignar colores "oficiales" a cada categoría
+    function getColor(riesgo) {
+      switch (riesgo) {
+        case 'ZONA PROHIBIDA':
+          // Reemplaza por tu color oficial
+          return '#001f3f';
+        case 'ZONA DE RESTRICCIÓN SEVERA':
+          // Reemplaza por tu color oficial
+          return '#0074D9';
+        case 'ZONA DE RESTRICCIÓN SEVERA TEMPORARIA':
+          // Reemplaza por tu color oficial
+          return '#7FDBFF';
+        case 'ZONA DE RESTRICCIÓN LEVE':
+          // Reemplaza por tu color oficial
+          return '#BBDEFB';
+        default:
+          return '#999999'; // gris si algo no matchea
+      }
+    }
+
+    // 4) Estilo de polígono
+    function style(feature) {
+      return {
+        fillColor: getColor(feature.properties.RIESGO),
+        color: '#333',  // borde
+        weight: 1,
+        fillOpacity: 0.6
+      };
+    }
+
+    // 5) Cargar GeoJSON
+    fetch('Geojson_84.geojson')
+      .then(function(response) {
+        if (!response.ok) {
+          throw new Error('No se encontró Geojson_84.geojson');
+        }
+        return response.json();
+      })
+      .then(function(data) {
+        console.log('Features totales:', data.features.length);
+        var capa = L.geoJSON(data, {
+          style: style,
+          onEachFeature: function(feature, layer) {
+            if (feature.properties && feature.properties.RIESGO) {
+              layer.bindPopup(`<strong>Zona:</strong> ${feature.properties.RIESGO}`);
+            }
+          }
+        }).addTo(map);
+
+        map.fitBounds(capa.getBounds());
+      })
+      .catch(function(error) {
+        console.error('Error al cargar el GeoJSON:', error);
+        alert('No se pudo cargar el archivo GeoJSON. Ver consola.');
+      });
+
+    // 6) Leyenda (mismos 4 colores)
+    var legend = L.control({ position: 'bottomright' });
+    legend.onAdd = function() {
+      var div = L.DomUtil.create('div', 'legend');
+      div.innerHTML += '<h4>Zonas Res. 121/14</h4>';
+
+      var categorias = [
+        'ZONA PROHIBIDA',
+        'ZONA DE RESTRICCIÓN SEVERA',
+        'ZONA DE RESTRICCIÓN SEVERA TEMPORARIA',
+        'ZONA DE RESTRICCIÓN LEVE'
+      ];
+
+      categorias.forEach(function(cat) {
+        div.innerHTML += `
+          <i style="background:${getColor(cat)}"></i>
+          ${cat}<br/>
+        `;
+      });
+      return div;
+    };
+    legend.addTo(map);
+  </script>
+</body>
+</html>
