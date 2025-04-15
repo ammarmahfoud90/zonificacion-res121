@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Visor de Zonificación por Resolución</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; }
+    #map { height: 90%; width: 100%; }
+    #selector { padding: 10px; background: #f2f2f2; }
+    select { font-size: 16px; padding: 5px; }
+    .legend {
+      background: white;
+      padding: 10px;
+      line-height: 18px;
+      color: #555;
+      box-shadow: 0 0 15px rgba(0,0,0,0.2);
+      border-radius: 5px;
+      font-size: 14px;
+    }
+    .legend i {
+      width: 18px;
+      height: 18px;
+      float: left;
+      margin-right: 8px;
+      opacity: 0.7;
+    }
+  </style>
+</head>
+<body>
+<div id="selector">
+  <label for="resSelect"><strong>Seleccionar resolución:</strong></label>
+  <select id="resSelect">
+    <option value="res_121_14.geojson">Resolución 121/14</option>
+    <option value="res_303_2017.geojson">Resolución 303/2017</option>
+  </select>
+</div>
+<div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    var map = L.map('map').setView([-27.45, -58.99], 11);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    var geojsonLayer;
+    var legend;
+
+    function getColor(res, riesgo) {
+      if (res === 'res_121_14.geojson') {
+        switch (riesgo) {
+          case 'ZONA PROHIBIDA': return '#001f3f';
+          case 'ZONA DE RESTRICCIÓN SEVERA': return '#0074D9';
+          case 'ZONA DE RESTRICCIÓN SEVERA TEMPORARIA': return '#7FDBFF';
+          case 'ZONA DE RESTRICCIÓN LEVE': return '#BBDEFB';
+          default: return '#999999';
+        }
+      } else if (res === 'res_303_2017.geojson') {
+        switch (riesgo) {
+          case 'Prohibida': return '#FF0000';
+          case 'Severa': return '#006400';
+          case 'Leve Regulada': return '#B2DFDB';
+          case 'Leve': return '#E0F7FA';
+          case 'Factible de Urbanizar': return '#E91E63';
+          default: return '#CCCCCC';
+        }
+      }
+      return '#999999';
+    }
+
+    function style(feature, res) {
+      const riesgo =
+        res === 'res_121_14.geojson'
+          ? feature.properties.RIESGO
+          : feature.properties.RIESGO || feature.properties.riesgo || feature.properties.CLASS;
+      return {
+        fillColor: getColor(res, riesgo),
+        color: '#333',
+        weight: 1,
+        fillOpacity: 0.6
+      };
+    }
+
+    function updateLegend(zonas, res) {
+      if (legend) map.removeControl(legend);
+      legend = L.control({ position: 'bottomright' });
+      legend.onAdd = function() {
+        var div = L.DomUtil.create('div', 'legend');
+        div.innerHTML += '<h4>Zonas de Riesgo</h4>';
+        zonas.forEach(function(zona) {
+          div.innerHTML += `<i style="background:${getColor(res, zona)}"></i> ${zona}<br/>`;
+        });
+        return div;
+      };
+      legend.addTo(map);
+    }
+
+    function loadGeoJSON(file) {
+      if (geojsonLayer) map.removeLayer(geojsonLayer);
+      fetch(file)
+        .then(response => response.json())
+        .then(data => {
+          geojsonLayer = L.geoJSON(data, {
+            style: (feature) => style(feature, file),
+            onEachFeature: function(feature, layer) {
+              const riesgo =
+                file === 'res_121_14.geojson'
+                  ? feature.properties.RIESGO
+                  : feature.properties.RIESGO || feature.properties.riesgo || feature.properties.CLASS;
+              if (riesgo) {
+                layer.bindPopup(`<strong>Zona:</strong> ${riesgo}`);
+              }
+            }
+          }).addTo(map);
+          map.fitBounds(geojsonLayer.getBounds());
+
+          const categorias = [...new Set(data.features.map(f =>
+            file === 'res_121_14.geojson'
+              ? f.properties.RIESGO
+              : f.properties.RIESGO || f.properties.riesgo || f.properties.CLASS
+          ))].filter(Boolean);
+          updateLegend(categorias, file);
+        });
+    }
+
+    document.getElementById('resSelect').addEventListener('change', function(e) {
+      loadGeoJSON(e.target.value);
+    });
+
+    loadGeoJSON(document.getElementById('resSelect').value);
+  });
+</script>
+</body>
+</html>
